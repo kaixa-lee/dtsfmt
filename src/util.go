@@ -20,11 +20,19 @@ func (p *Prettier) curText() string {
 	return p.cursor.Node().Utf8Text(p.content)
 }
 
-func (p *Prettier) sep() {
+func (p *Prettier) sepLine() {
 	if strings.HasSuffix(string(p.buf.Bytes()), "\n\n") {
 		return
 	}
 	p.write([]byte{'\n'})
+}
+
+func (p *Prettier) sepSpace() {
+	c := p.buf.Bytes()[p.buf.Len()-1]
+	if c == '\n' || c == '\r' || c == '\t' || c == ' ' {
+		return
+	}
+	p.buf.WriteByte(' ')
 }
 
 func (p *Prettier) writeIndent() {

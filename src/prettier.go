@@ -32,8 +32,12 @@ func (p *Prettier) Prettify(fn string) ([]byte, error) {
 
 	p.cursor = parser.Parse(p.content, nil).Walk()
 	p.cursor.GotoFirstChild()
-	for ; p.hasNext(); p.cursor.GotoNextSibling() {
+
+	for {
 		p.traverse()
+		if !p.cursor.GotoNextSibling() {
+			break
+		}
 	}
 
 	return p.buf.Bytes(), nil
@@ -56,6 +60,7 @@ func (p *Prettier) loadFile(fn string) error {
 func (p *Prettier) traverse() {
 	fmt.Println("node_kind:", p.cursor.Node().Kind())
 
+	// todo 应该尽可能地减少token枚举类型, 只处理关键类型
 	switch p.cursor.Node().Kind() {
 	case NodeKindComment:
 		p.WriteComment()
@@ -63,23 +68,24 @@ func (p *Prettier) traverse() {
 		p.WriteFileVersion()
 	case NodeKindPreprocInclude:
 		p.WritePreprocInclude()
-	case NodeKindPreprocDef:
-	case NodeKindPreprocFunctionDef:
-	case NodeKindPreprocIfdef:
-	case NodeKindLabeledItem:
 	case NodeKindNode:
+		p.WriteNode()
+	case NodeKindLeftBracket:
+		p.WriteLeftBracket()
+	case NodeKindRightBracket:
+		p.WriteRightBracket()
 	case NodeKindProperty:
+		p.WriteProperty()
 	case NodeKindStringLiteral:
-	case NodeKindIntegerCells:
+		p.WriteStringLiteral()
 	default:
-		// todo 如果没有具体的类型, 是否可以直接把str写下来
 		p.WriteDefault()
 	}
 }
 
 func (p *Prettier) WriteComment() {
 	if !p.lastIs(NodeKindComment) {
-		p.sep()
+		p.sepLine()
 	}
 	p.writeIndent()
 	commentText := p.curText()
@@ -93,10 +99,10 @@ func (p *Prettier) WriteComment() {
 }
 
 func (p *Prettier) WriteFileVersion() {
-	p.sep()
+	p.sepLine()
 	p.writeString(p.curText())
 	p.writeNewLine()
-	p.sep()
+	p.sepLine()
 }
 
 func (p *Prettier) WritePreprocInclude() {
@@ -109,14 +115,76 @@ func (p *Prettier) WritePreprocInclude() {
 	p.cursor.GotoParent()
 }
 
-func (p *Prettier) WriteDefault() {
-	if !p.cursor.GotoFirstChild() {
-		return
+func (p *Prettier) WriteNode() {
+	p.sepLine()
+	if !p.lastIs(NodeKindColon) {
+		p.writeIndent()
 	}
-	p.indent += 1
-	for ; p.hasNext(); p.cursor.GotoNextSibling() {
+
+	p.cursor.GotoFirstChild()
+	p.writeString(p.curText())
+	for p.cursor.GotoNextSibling() {
 		p.traverse()
 	}
-	p.indent -= 1
+	p.writeIndent()
+	p.writeNewLine()
+	p.cursor.GotoParent()
+}
+
+func (p *Prettier) WriteLeftBracket() {
+	p.sepSpace()
+	p.writeString(p.curText())
+	if !p.nextIs(NodeKindRightBracket) {
+		p.writeNewLine()
+		p.indent += 1
+	}
+}
+
+func (p *Prettier) WriteRightBracket() {
+	if !p.lastIs(NodeKindLeftBracket) {
+		p.indent -= 1
+		p.writeIndent()
+	}
+	p.writeString(p.curText())
+}
+
+func (p *Prettier) WriteProperty() {
+	p.writeIndent()
+	p.cursor.GotoFirstChild()
+	p.writeString(p.curText())
+	for p.cursor.GotoNextSibling() {
+		switch p.cursor.Node().Kind() {
+		case NodeKindComma:
+			p.writeString(", ")
+		case NodeKindEq:
+			p.writeString(" = ")
+		case NodeKineSemiColon:
+		default:
+			p.traverse()
+		}
+	}
+	p.writeString(";")
+	p.writeNewLine()
+	p.cursor.GotoParent()
+	if p.nextIs(NodeKindNode) {
+		p.writeNewLine()
+	}
+}
+
+func (p *Prettier) WriteStringLiteral() {
+	p.writeString(p.curText())
+}
+
+func (p *Prettier) WriteDefault() {
+	if !p.cursor.GotoFirstChild() {
+		p.writeString(p.curText())
+		return
+	}
+	for {
+		p.traverse()
+		if !p.cursor.GotoNextSibling() {
+			break
+		}
+	}
 	p.cursor.GotoParent()
 }
