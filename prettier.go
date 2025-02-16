@@ -1,4 +1,4 @@
-package main
+package dtsfmt
 
 import (
 	"bytes"
@@ -16,6 +16,8 @@ type Prettier struct {
 	content []byte
 
 	indent int
+
+	isDebug bool
 
 	cursor *tree_sitter.TreeCursor
 }
@@ -78,6 +80,8 @@ func (p *Prettier) traverse() {
 		p.WriteProperty()
 	case NodeKindStringLiteral:
 		p.WriteStringLiteral()
+	case NodeKineLT:
+		p.WriteLT()
 	default:
 		p.WriteDefault()
 	}
@@ -173,6 +177,40 @@ func (p *Prettier) WriteProperty() {
 
 func (p *Prettier) WriteStringLiteral() {
 	p.writeString(p.curText())
+}
+
+func (p *Prettier) WriteLT() {
+	p.writeString("<")
+	tmpCursor := p.cursor.Copy()
+	cnt := 0
+	for tmpCursor.GotoNextSibling() {
+		if p.curText() == ">" {
+			break
+		}
+		cnt += 1
+	}
+	blockPrint := false
+	if cnt > 4 {
+		p.writeNewLine()
+		p.indent += 1
+		blockPrint = true
+	}
+	cnt = 0
+	for p.cursor.GotoNextSibling() {
+		if cnt > 4 {
+			p.writeNewLine()
+			p.writeIndent()
+			cnt = 0
+		}
+		p.writeString(p.curText())
+		if !p.nextIs(">") {
+			p.writeString(" ")
+		}
+		cnt += 1
+	}
+	if blockPrint {
+		p.indent -= 1
+	}
 }
 
 func (p *Prettier) WriteDefault() {

@@ -1,4 +1,4 @@
-package main
+package dtsfmt
 
 const (
 	// 完整定义见 https://github.com/joelspadin/tree-sitter-devicetree/blob/main/src/node-types.json
@@ -8,6 +8,7 @@ const (
 	NodeKindComma              = ","
 	NodeKindEq                 = "="
 	NodeKineSemiColon          = ";"
+	NodeKineLT                 = "<"
 	NodeKindLeftBracket        = "{"
 	NodeKindRightBracket       = "}"
 	NodeKindComment            = "comment"

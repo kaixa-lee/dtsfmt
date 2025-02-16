@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: (GPL-2.0-only OR BSD-3-Clause)
+       //       SPDX-License-Identifier: (GPL-2.0-only OR BSD-3-Clause)
 /*
  * Copyright (C) 2020, Intel Corporation
  *
@@ -10,7 +10,7 @@
 #include "keembay-soc.dtsi"
 
 / {
-	model = "Keem Bay EVM";
+	model =      "Keem Bay EVM";
 	compatible = "intel,keembay-evm", "intel,keembay";
 
 	#address-cells = <2>;
@@ -27,7 +27,7 @@
 	memory@80000000 {
 		device_type = "memory";
 		/* 2GB of DDR memory. */
-		reg = <0x0 0x80000000 0x0 0x80000000>;
+		reg = <0x0     0x80000000 0x0 0x80000000 0x0     0x80000000 0x0 0x80000000 0x0     0x80000000 0x0 0x80000000>;
 	};
 
 };
