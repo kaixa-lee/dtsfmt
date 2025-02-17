@@ -19,6 +19,8 @@ type Prettier struct {
 
 	isDebug bool
 
+	BlockPrint bool
+
 	cursor *tree_sitter.TreeCursor
 }
 
@@ -80,8 +82,10 @@ func (p *Prettier) traverse() {
 		p.WriteProperty()
 	case NodeKindStringLiteral:
 		p.WriteStringLiteral()
-	case NodeKineLT:
+	case NodeKindLT:
 		p.WriteLT()
+	case NodeKindGT:
+		p.WriteGT()
 	default:
 		p.WriteDefault()
 	}
@@ -162,7 +166,7 @@ func (p *Prettier) WriteProperty() {
 			p.writeString(", ")
 		case NodeKindEq:
 			p.writeString(" = ")
-		case NodeKineSemiColon:
+		case NodeKindSemiColon:
 		default:
 			p.traverse()
 		}
@@ -189,28 +193,43 @@ func (p *Prettier) WriteLT() {
 		}
 		cnt += 1
 	}
-	blockPrint := false
+
 	if cnt > 4 {
 		p.writeNewLine()
 		p.indent += 1
-		blockPrint = true
+		p.BlockPrint = true
+		p.writeIndent()
 	}
 	cnt = 0
 	for p.cursor.GotoNextSibling() {
-		if cnt > 4 {
+		if cnt >= 4 {
 			p.writeNewLine()
 			p.writeIndent()
 			cnt = 0
 		}
 		p.writeString(p.curText())
-		if !p.nextIs(">") {
+		if !p.nextIs(">") && cnt != 3 {
 			p.writeString(" ")
+		}
+		if p.nextIs(">") {
+			if cnt >= 4 {
+				p.writeNewLine()
+			}
+			break;
 		}
 		cnt += 1
 	}
-	if blockPrint {
+	if p.BlockPrint {
 		p.indent -= 1
 	}
+}
+
+func (p *Prettier) WriteGT() {
+	if p.BlockPrint {
+		p.writeNewLine()
+		p.writeIndent()
+	}
+	p.writeString(">")
 }
 
 func (p *Prettier) WriteDefault() {
