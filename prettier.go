@@ -11,15 +11,15 @@ import (
 )
 
 type Prettier struct {
+	isDebug bool
+
+	integerCellSize int
+
 	buf *bytes.Buffer
 
 	content []byte
 
 	indent int
-
-	isDebug bool
-
-	BlockPrint bool
 
 	cursor *tree_sitter.TreeCursor
 }
@@ -62,7 +62,9 @@ func (p *Prettier) loadFile(fn string) error {
 }
 
 func (p *Prettier) traverse() {
-	fmt.Println("node_kind:", p.cursor.Node().Kind())
+	if p.isDebug {
+		fmt.Println("node_kind:", p.cursor.Node().Kind())
+	}
 
 	// todo 应该尽可能地减少token枚举类型, 只处理关键类型
 	switch p.cursor.Node().Kind() {
@@ -82,10 +84,8 @@ func (p *Prettier) traverse() {
 		p.WriteProperty()
 	case NodeKindStringLiteral:
 		p.WriteStringLiteral()
-	case NodeKindLT:
-		p.WriteLT()
-	case NodeKindGT:
-		p.WriteGT()
+	case NodeKindIntegerCells:
+		p.WriteIntegerCells()
 	default:
 		p.WriteDefault()
 	}
@@ -156,6 +156,51 @@ func (p *Prettier) WriteRightBracket() {
 	p.writeString(p.curText())
 }
 
+func (p *Prettier) WriteIntegerCells() {
+	p.writeString("<")
+	p.cursor.GotoFirstChild()
+
+	cellSize, tmpCursor := 0, p.cursor.Copy()
+	for tmpCursor.GotoNextSibling() {
+		if tmpCursor.Node().Utf8Text(p.content) != ">" {
+			cellSize += 1
+		}
+	}
+
+	if cellSize >= p.integerCellSize {
+		p.indent += 1
+		p.writeNewLine()
+		p.writeIndent()
+	}
+
+	cnt := 0
+	for p.cursor.GotoNextSibling() {
+		if p.curText() == ">" {
+			break
+		}
+		if cnt >= p.integerCellSize {
+			p.writeNewLine()
+			p.writeIndent()
+			cnt = 0
+		}
+		if !p.lastIs("<") {
+			p.sepSpace()
+		}
+
+		p.writeString(p.curText())
+		cnt += 1
+	}
+
+	if cellSize >= p.integerCellSize {
+		p.indent -= 1
+		p.writeNewLine()
+		p.writeIndent()
+	}
+	p.writeString(">")
+
+	p.cursor.GotoParent()
+}
+
 func (p *Prettier) WriteProperty() {
 	p.writeIndent()
 	p.cursor.GotoFirstChild()
@@ -186,50 +231,45 @@ func (p *Prettier) WriteStringLiteral() {
 func (p *Prettier) WriteLT() {
 	p.writeString("<")
 	tmpCursor := p.cursor.Copy()
-	cnt := 0
+	cellSize := 0
 	for tmpCursor.GotoNextSibling() {
-		if p.curText() == ">" {
+		if tmpCursor.Node().Utf8Text(p.content) == ">" {
 			break
 		}
-		cnt += 1
+		cellSize += 1
 	}
 
-	if cnt > 4 {
-		p.writeNewLine()
+	if cellSize > p.integerCellSize {
 		p.indent += 1
-		p.BlockPrint = true
+		p.writeNewLine()
 		p.writeIndent()
 	}
-	cnt = 0
+	cnt := 0
 	for p.cursor.GotoNextSibling() {
-		if cnt >= 4 {
+		if cnt >= p.integerCellSize {
 			p.writeNewLine()
 			p.writeIndent()
 			cnt = 0
 		}
 		p.writeString(p.curText())
-		if !p.nextIs(">") && cnt != 3 {
+		if !p.nextIs(">") && cnt != p.integerCellSize-1 {
 			p.writeString(" ")
 		}
 		if p.nextIs(">") {
-			if cnt >= 4 {
+			if cnt >= p.integerCellSize {
 				p.writeNewLine()
 			}
-			break;
+			break
 		}
 		cnt += 1
 	}
-	if p.BlockPrint {
+	if cellSize > 1 {
 		p.indent -= 1
-	}
-}
-
-func (p *Prettier) WriteGT() {
-	if p.BlockPrint {
 		p.writeNewLine()
 		p.writeIndent()
 	}
 	p.writeString(">")
+	p.cursor.GotoParent()
 }
 
 func (p *Prettier) WriteDefault() {
